@@ -190,7 +190,7 @@ def automagic():
     ip = interface_info[netifaces.AF_INET][0]['addr'] #Get current IP
     cidr = sum(bin(int(x)).count('1') for x in interface_info[netifaces.AF_INET][0]['netmask'].split('.'))
     target = ip +"/"+str(cidr)
-    spinner.text="Scanning "+target+" for APC devices with telnet(tcp/23) and HTTP(tcp/80) open..."
+    spinner.text="Scanning "+target+" for devices on the network..."
     spinner.start()
     results = nm.scan(target,arguments='-sV')
     #prGreen("[+] OS: "+results['scan']['ip']['osmatch'][0]['name'])
@@ -202,9 +202,10 @@ def automagic():
         for port in results['scan'][host]['tcp']:
             service = results['scan'][host]['tcp'][port]['name']
             product = results['scan'][host]['tcp'][port]['product']
-            print(results['scan'][host])
+            #print(results['scan'][host])
             prGreen("[+] Port: "+str(port))
             prGreen('[+] Service: '+service)
+            prGreen('[+] Product: '+product)
             if (port==23 or port==80) and (service=='telnet' or service=='http') and 'apc' in product:
                 apc_devices.append(host)
             elif('windows' in service): #TODO add more coniditions here to narrow it down

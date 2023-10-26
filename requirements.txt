@@ -1,0 +1,6 @@
+halo==0.0.31
+netifaces==0.11.0
+pyfiglet==1.0.2
+python_nmap==0.7.1
+Requests==2.31.0
+scapy==2.5.0
